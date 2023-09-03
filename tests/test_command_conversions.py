@@ -1,7 +1,7 @@
 import pytest
 
-from despiste.program import D1BusControlCommand, AluControlCommand, AluOpcodes, D1BusOpcodes, D1BusDataDestination, \
-    D1BusDataSource, YBusControlCommand, YBusOpcodes, XYBusDataSource, XBusOpcodes, XBusControlCommand
+from despiste.commands import D1BusControlCommand, AluControlCommand, AluOpcodes, D1BusOpcodes, D1BusDataDestination, \
+    D1BusDataSource, YBusControlCommand, YBusOpcodes, XYBusDataSource, XBusOpcodes, XBusControlCommand, EndCommand
 
 
 # ALU

@@ -186,7 +186,7 @@ def generate_instruction_from_line(line: str) -> Instruction:
     if not instruction.d1BusControlCommand:
         instruction.d1BusControlCommand = D1BusControlCommand()
         instruction.d1BusControlCommand.opcode = D1BusOpcodes.NOP
-
+    print(f"Instruction parsed: {instruction.to_text()}")
     return instruction
 
 
