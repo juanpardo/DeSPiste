@@ -531,3 +531,89 @@ class DMACommand(SpecialCommand):
             result += self.dma_counter_ram.name
 
         return [result]
+
+
+class MVIOpcodes(OpCodes):
+    MVI = "10"
+
+
+class MVIStorageDestination(Enum):
+    MC0 = "0000"
+    MC1 = "0001"
+    MC2 = "0010"
+    MC3 = "0011"
+    RX = "0100"
+    PL = "0101"
+    RA0 = "0110"
+    WA0 = "0111"
+
+    LOP = "1010"
+
+    PC = "1100"
+
+
+class MVIConditionStatus(Enum):
+    Z   = "100001"  # If Z == 1
+    NZ  = "000001"  # If Z == 0
+    S   = "100010"  # If S == 1
+    NS  = "000010"  # If S == 0
+    C   = "100100"  # If C == 1
+    NC  = "000100"  # If C == 0
+    T0  = "101000"  # If T0 == 1
+    NT0 = "001000"  # If T0 == 0
+    ZS  = "100011"  # If Z == 1 OR S == 1
+    NZS = "000011"  # If Z == 0 AND S == 0
+
+
+class MVICommand(SpecialCommand):
+    opcode: MVIOpcodes
+    immediate: int
+    destination: MVIStorageDestination
+    condition: MVIConditionStatus
+
+    @staticmethod
+    def from_text(source: List[str]) -> Command:
+        cmd = MVICommand()
+        assert source[0] == 'MVI'
+        cmd.opcode = MVIOpcodes.MVI
+        cmd.immediate = int(source[1][1:]) if source[1].startswith('#') else int(source[1])
+        cmd.destination = MVIStorageDestination[source[2]]
+
+        if len(source) == 4:
+            cmd.condition = MVIConditionStatus[source[3]]
+        else:
+            cmd.condition = None
+
+        return cmd
+
+    def to_text(self) -> List[str]:
+        result = f"MVI #{self.immediate},{self.destination.name}"
+        if self.condition:
+            result += f",{self.condition.name}"
+
+        return [result]
+
+    @staticmethod
+    def from_binary(source: str) -> Command:
+        assert len(source) == 32
+        cmd = MVICommand()
+        cmd.opcode = MVIOpcodes(cut(source, 30, 32))
+        cmd.destination = MVIStorageDestination(cut(source, 26, 30))
+        if cut(source, 25, 26) == "1":
+            cmd.condition = MVIConditionStatus(cut(source, 19, 25))
+            cmd.immediate = int(cut(source, 0, 19), 2)
+        else:
+            cmd.condition = None
+            cmd.immediate = int(cut(source, 0, 25), 2)
+
+        return cmd
+
+    def to_binary(self) -> str:
+        result = f"{self.opcode.value}{self.destination.value}"
+        if self.condition:
+            result += f"1{self.condition.value}"
+            result += bin(self.immediate)[2:].zfill(19)
+        else:
+            result += "0" + bin(self.immediate)[2:].zfill(25)
+
+        return result

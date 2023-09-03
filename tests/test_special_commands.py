@@ -1,7 +1,7 @@
 # End Commands
 import pytest
 
-from despiste.commands import EndCommand, EndOpcodes, LoopCommand, LoopOpcodes, DMACommand
+from despiste.commands import EndCommand, EndOpcodes, LoopCommand, LoopOpcodes, DMACommand, MVICommand
 
 
 # END and Loop commands
@@ -112,3 +112,52 @@ def test_dma_binary(expected_text, bits):
 def test_dma_text(text):
     cmd = DMACommand.from_text(text)
     assert cmd.to_text() == [f"{text[0]} {text[1]},{text[2]},{text[3]}"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        (["MVI", "128", "WA0"]),
+        (["MVI", "#128", "PL"]),
+        (["MVI", "128", "WA0", "NZ"]),
+        (["MVI", "#128", "PL", "ZS"]),
+    ]
+)
+def test_mvi_text(text):
+    cmd = MVICommand.from_text(text)
+    immediate = text[1] if text[1].startswith('#') else "#" + text[1]
+    if len(text) == 4:
+        assert cmd.to_text() == [f"{text[0]} {immediate},{text[2]},{text[3]}"]
+    else:
+        assert cmd.to_text() == [f"{text[0]} {immediate},{text[2]}"]
+
+
+@pytest.mark.parametrize(
+    "expected_text,bits",
+    [
+        (
+            "MVI #4,MC3",
+
+            "10"          # Opcode
+            "0011"           # Destination
+            "0"         # MVI mode: Unconditional
+            "00000000000000000000"              # Immediate, high 20
+            "00100"      # Immediate value (remaining lower 5 bits)
+        ),
+        (
+            "MVI #4,LOP,NZ",
+
+            "10"  # Opcode
+            "1010"  # Destination
+            "1"  # MVI mode: Conditional
+            "000001" # Condition
+            "00000000000000"  # Immediate, high 14
+            "00100"  # Immediate value (remaining lower 5 bits)
+        ),
+    ]
+)
+def test_mvi_binary(expected_text, bits):
+    assert len(bits) == 32
+    cmd = MVICommand.from_binary(bits)
+    assert cmd.to_binary() == bits
+    assert cmd.to_text() == [expected_text]
