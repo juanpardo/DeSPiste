@@ -415,6 +415,17 @@ class DMACounterMode(Enum):
     REFERENCED = "1"
 
 
+class DMACounterRam(Enum):
+    MC0 = "000"
+    MC1 = "001"
+    MC2 = "010"
+    MC3 = "011"
+    CT0 = '100'
+    CT1 = '101'
+    CT2 = '110'
+    CT3 = '111'
+
+
 class DMACommand(SpecialCommand):
     opcode: DMAOpcodes
     hold: bool  # Determines if the DSP is to wait for the DMA transfer to finish?
@@ -423,6 +434,7 @@ class DMACommand(SpecialCommand):
     dma_mode: DMATransferMode
     data_size: int = None
     dma_counter_mode: DMACounterMode
+    dma_counter_ram: DMACounterRam
 
     @staticmethod
     def from_binary(source: str):
@@ -449,7 +461,10 @@ class DMACommand(SpecialCommand):
 
         # Destination
         cmd.ram_address_pointer = DMADataRam(cut(source, 8, 11))
-        cmd.data_size = int(cut(source, 0, 8), 2)
+        if cmd.dma_counter_mode == DMACounterMode.IMMEDIATE:
+            cmd.data_size = int(cut(source, 0, 8), 2)
+        else:
+            cmd.dma_counter_ram = DMACounterRam(cut(source, 0, 3))
 
         return cmd
 
@@ -465,7 +480,10 @@ class DMACommand(SpecialCommand):
         result += "0"  # padding
 
         result += self.ram_address_pointer.value
-        result += bin(self.data_size)[2:].rjust(8, "0")
+        if self.dma_counter_mode == DMACounterMode.IMMEDIATE:
+            result += bin(self.data_size)[2:].rjust(8, "0")
+        else:
+            result += self.dma_counter_ram.value.rjust(8, "0")
 
         return result
 
@@ -488,7 +506,12 @@ class DMACommand(SpecialCommand):
             cmd.dma_mode = DMATransferMode.RAM_TO_D0
             cmd.ram_address_pointer = DMADataRam[source[1]]
 
-        cmd.data_size = int(source[3])
+        try:
+            cmd.dma_counter_ram = DMACounterRam[source[3]]
+            cmd.dma_counter_mode = DMACounterMode.REFERENCED
+        except KeyError:
+            cmd.data_size = int(source[3])
+            cmd.dma_counter_mode = DMACounterMode.IMMEDIATE
 
         return cmd
 
@@ -502,6 +525,9 @@ class DMACommand(SpecialCommand):
         else:
             result += f" {self.ram_address_pointer.name},D0,"
 
-        result += str(self.data_size)
+        if self.dma_counter_mode == DMACounterMode.IMMEDIATE:
+            result += str(self.data_size)
+        else:
+            result += self.dma_counter_ram.name
 
         return [result]

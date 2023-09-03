@@ -82,6 +82,16 @@ def test_end_loop_text(text, ctype):
             "001"  # Destination
             "00000100"  # Counter immediate value
         ),
+        (
+                "DMAH MC1,D0,MC3",
+
+                "1100"  # Opcode
+                "0000000000"  # padding
+                "000"  # Add mode
+                "1110"  # DMA mode
+                "001"  # Destination
+                "00000011"  # Counter source value
+        ),
     ]
 )
 def test_dma_binary(expected_text, bits):
