@@ -44,58 +44,24 @@ def generate_command_from_text(data: List[str]) -> Command:
     elif data[0] == 'MOV':
         # Y Bus cmd?
         if data[2] in ['Y', 'A']:
-            cmd = YBusControlCommand()
-            if data[2] == 'Y':
-                cmd.opcode = YBusOpcodes.MOV_SRC_Y
-                cmd.source = XYBusDataSource[data[1]]
-            else:
-                try:
-                    cmd.source = XYBusDataSource[data[1]]
-                    cmd.opcode = YBusOpcodes.MOV_SRC_A
-                except KeyError:
-                    cmd.opcode = YBusOpcodes.MOV_ALU_A
-            return cmd
+            return YBusControlCommand.from_text(data)
 
         # X Bus cmd?
         elif data[2] in ['X', 'P']:
-            cmd = XBusControlCommand()
-            if data[2] == 'X':
-                cmd.opcode = XBusOpcodes.MOV_SRC_X
-                cmd.source = XYBusDataSource[data[1]]
-            else:
-                try:
-                    cmd.source = XYBusDataSource[data[1]]
-                    cmd.opcode = XBusOpcodes.MOV_SRC_P
-                except KeyError:
-                    cmd.opcode = XBusOpcodes.MOV_MUL_P
-            return cmd
+            return XBusControlCommand.from_text(data)
 
         # D1 Bus cmd!
         else:
-            cmd = D1BusControlCommand()
-            cmd.destination = D1BusDataDestination[data[2]]
-            # Using SRC?
-            try:
-                cmd.source = D1BusDataSource[data[1]]
-                cmd.opcode = D1BusOpcodes.MOV_IMM_DST
-            except KeyError:
-                if data[1].startswith('#'):
-                    data[1] = data[1][1:]
-                cmd.immediate = int(data[1])
-                cmd.opcode = D1BusOpcodes.MOV_IMM_DST
+            return D1BusControlCommand.from_text(data)
 
     elif data[0] == 'CLR':
         # We treat it specially because then only MOV ops are left for YBus ^^
-        cmd = YBusControlCommand()
-        cmd.opcode = YBusOpcodes.CLR_A
-        return cmd
+        return YBusControlCommand.from_text(data)
 
     else:
         try:
             op = AluOpcodes[data[0]]
-            cmd = AluControlCommand()
-            cmd.opcode = op
-            return cmd
+            return AluControlCommand.from_text(data)
         except KeyError:
             # Not an AluControlCommand
             raise Exception(f"Command not supported. Data: {data}")
@@ -176,15 +142,30 @@ def generate_instruction_from_line(line: str) -> Instruction:
     return instruction
 
 
+def print_as_hex_numbers(bin_str: str):
+    numbers = [int(bin_str[i:i + 32], 2) for i in range(0, len(bin_str), 32)]
+    for n in numbers:
+        print(f"{n:#0{10}x}")
+
+
+def write_to_file(output_file: str, bin_str: str):
+    numbers = [int(bin_str[i:i + 32], 2) for i in range(0, len(bin_str), 32)]
+    foo = bytearray()
+    for n in numbers:
+        b = n.to_bytes(4)
+        foo += bytearray(b)
+    write_file_content(output_file, foo)
+
+
 def do_compile(input_file: str, output_file: str):
     input_bytes = read_file_content(input_file)
     input_lines = input_bytes.decode("utf-8").splitlines()
 
     p = Program.from_text(input_lines)
 
-    if output_file is None:
-        print(p.to_binary())
-    else:
-        write_file_content(output_file, p.to_binary())
+    bin_str = p.to_binary()
+    print_as_hex_numbers(bin_str)
+    if output_file:
+        write_to_file(output_file, bin_str)
 
     raise SystemExit(0)

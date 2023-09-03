@@ -155,7 +155,7 @@ class XYBusDataSource(Enum):
 
 
 class YBusControlCommand(Command):
-    source: XYBusDataSource
+    source: XYBusDataSource = None
 
     @staticmethod
     def from_binary(source):
@@ -235,7 +235,7 @@ class XBusOpcodes(OpCodes):
 
 
 class XBusControlCommand(Command):
-    source: XYBusDataSource
+    source: XYBusDataSource = None
 
     _ops_with_source = [
         XBusOpcodes.MOV_SRC_X,
@@ -693,3 +693,40 @@ class JumpCommand:
         result += "".zfill(12)
         result += bin(self.immediate)[2:].zfill(7)
         return result
+
+
+def generate_command_from_text(data: List[str]) -> Command:
+    print(f"generate_command data: {data}")
+    if data[0] == 'NOP':
+        return None
+    elif data[0] == 'MOV':
+        # Y Bus cmd?
+        if data[2] in ['Y', 'A']:
+            return YBusControlCommand.from_text(data)
+
+        # X Bus cmd?
+        elif data[2] in ['X', 'P']:
+            return XBusControlCommand.from_text(data)
+
+        # D1 Bus cmd!
+        else:
+            return D1BusControlCommand.from_text(data)
+
+    elif data[0] == 'CLR':
+        # We treat it specially because then only MOV ops are left for YBus ^^
+        return YBusControlCommand.from_text(data)
+
+    elif data[0] in AluOpcodes._member_names_:
+        return AluControlCommand.from_text(data)
+    elif data[0] in EndOpcodes._member_names_:
+        return EndCommand.from_text(data)
+    elif data[0] in LoopOpcodes._member_names_:
+        return LoopCommand.from_text(data)
+    elif data[0] in DMAOpcodes._member_names_:
+        return DMACommand.from_text(data)
+    elif data[0] in MVIOpcodes._member_names_:
+        return MVICommand.from_text(data)
+    elif data[0] in JumpOpcodes._member_names_:
+        return JumpCommand.from_text(data)
+
+    raise Exception(f"Command not supported. Data: {data}")

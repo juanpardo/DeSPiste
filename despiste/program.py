@@ -2,8 +2,39 @@ from enum import Enum
 from typing import List, Dict
 
 from despiste.commands import AluControlCommand, XBusControlCommand, YBusControlCommand, D1BusControlCommand, Command, \
-    SpecialCommand, XBusOpcodes, YBusOpcodes, EndCommand, LoopCommand, DMACommand, MVICommand, JumpCommand
+    SpecialCommand, XBusOpcodes, YBusOpcodes, EndCommand, LoopCommand, DMACommand, MVICommand, JumpCommand, \
+    generate_command_from_text
 from despiste.utils import cut
+
+
+command_args = {
+    'NOP': 0,
+    # ALU
+    'AND': 0,
+    'OR': 0,
+    'XOR': 0,
+    'ADD': 0,
+    'SUB': 0,
+    'AD2': 0,
+    'SR': 0,
+    'RR': 0,
+    'SL': 0,
+    'RL': 0,
+    'RL8': 0,
+
+    # OTHER
+    'MOV': 2,
+    'CLR': 1,
+    'DMA': 3,
+    'MVI': 2,
+    'JMP': [1, 2],
+    # LOOPS
+    'BTM': 0,
+    'LPS': 0,
+    # ENDS
+    'END': 0,
+    'ENDI': 0,
+}
 
 
 class Instruction:
@@ -18,6 +49,32 @@ class Instruction:
     d1BusControlCommand: D1BusControlCommand = None
 
     specialCommand: SpecialCommand = None
+
+    @staticmethod
+    def from_text(elements: List[str]) -> 'Instruction':
+        commands = []
+        current_command = []
+
+        for element in elements:
+            if len(current_command) == 0:
+                current_command.append(element)
+            elif command_args[current_command[0]] + 1 <= len(current_command):
+                cmd = generate_command_from_text(current_command)
+                if cmd:
+                    commands.append(cmd)
+                current_command = [element]
+            else:
+                current_command.append(element)
+
+        if len(current_command) > 0:
+            cmd = generate_command_from_text(current_command)
+            if cmd:
+                commands.append(cmd)
+
+        if len(commands):
+            return Instruction.from_commands(commands)
+        else:
+            return None
 
     @staticmethod
     def from_commands(cmds: List[Command]) -> 'Instruction':
@@ -139,7 +196,7 @@ class Program:
     The maximum amount of instructions that can be loaded is 256 (1KB of Program RAM).
     """
     instructions: List[Instruction] = []
-    labels: Dict[str, int]  # Key is the label name and value is the instruction index it points to
+    labels: Dict[str, int] = {}  # Key is the label name and value is the instruction index it points to
 
     @staticmethod
     def from_binary(source: str) -> 'Program':
@@ -172,7 +229,7 @@ class Program:
 
         # Clean up the label name by removing unwanted spaces and the colon
         key = label.replace(":", "", 1).strip()
-        assert not self.labels.has_key(key)
+        assert key not in self.labels
         self.labels[key] = instruction_offset
 
     def register_constant(self, line):
@@ -187,19 +244,24 @@ class Program:
         for line in lines:
             # Avoid the pesky commas, all upper case and clean
             line = line.replace(',', ' ').upper().strip()
+            # Is it a full line comment? Or perhaps empty?
+            if line.startswith(';') or line == '':
+                continue
+
+            # Remove any trailing comment
+            line = line.split(';', 1)[0]
             # Is it a label line?
             if line.endswith(':'):
                 # The label should point to the next instruction to be registered
                 p.register_label(line, len(p.instructions))
             # Is it a constant?
-            elif line.contains('='):
+            elif '=' in line:
                 p.register_constant(line)
-            # Is it a full line comment?
-            elif line.strip().startswith(';'):
-                pass
             else:
                 inst = Instruction.from_text(line.split())
                 p.instructions.append(inst)
+
+        return p
 
     def __str__(self):
         return "\n".join([str(x) for x in self.instructions])
