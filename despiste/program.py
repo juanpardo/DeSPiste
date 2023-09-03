@@ -106,9 +106,9 @@ class Instruction:
         elif cut(source, 28, 32) == '1111':
             inst.specialCommand = EndCommand.from_binary(cut(source, 27, 32))
             return inst
-        # JUMP cmds
+        # Loop cmds
         elif cut(source, 28, 32) == '1110':
-            inst.specialCommand = JumpCommand.from_binary()
+            inst.specialCommand = LoopCommand.from_binary(cut(source, 27, 32))
 
         else:
             raise Exception("Not implemented yet")

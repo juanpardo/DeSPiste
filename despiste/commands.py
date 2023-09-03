@@ -336,13 +336,14 @@ class SpecialCommand(Command):
     """
     pass
 
-
 class EndOpcodes(OpCodes):
     END = "11110"
     ENDI = "11111"
 
 
 class EndCommand(SpecialCommand):
+    opcode: EndOpcodes
+
     @staticmethod
     def from_binary(source: str) -> Command:
         cmd = EndCommand()
@@ -357,6 +358,34 @@ class EndCommand(SpecialCommand):
         assert len(source) == 1
         cmd = EndCommand()
         cmd.opcode = EndOpcodes[source[0]]
+        return cmd
+
+    def to_text(self) -> List[str]:
+        return [self.opcode.name]
+
+
+class LoopOpcodes(OpCodes):
+    BTM = "11100"
+    LPS = "11101"
+
+
+class LoopCommand(SpecialCommand):
+    opcode = LoopOpcodes
+
+    @staticmethod
+    def from_binary(source: str) -> Command:
+        cmd = LoopCommand()
+        cmd.opcode = LoopOpcodes(source)
+        return cmd
+
+    def to_binary(self) -> str:
+        return self.opcode.value.ljust(32, "0")
+
+    @staticmethod
+    def from_text(source: List[str]) -> Command:
+        assert len(source) == 1
+        cmd = LoopCommand()
+        cmd.opcode = LoopOpcodes[source[0]]
         return cmd
 
     def to_text(self) -> List[str]:
