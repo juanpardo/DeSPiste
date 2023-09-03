@@ -452,8 +452,36 @@ class LoopCommand(SpecialCommand):
 
 
 class DMAOpcodes(OpCodes):
-    DMA = "1100"
-    DMAH = "1100"
+    DMA     = "1100___"
+    DMAH    = "1100__H"
+    DMA0    = "1100_0"
+    DMA0H   = "1100_0H"
+    DMA1    = "1100_1"
+    DMA1H   = "1100_1H"
+    DMA2    = "1100_2"
+    DMA2H   = "1100_2H"
+    DMA4    = "1100_4"
+    DMA4H   = "1100_4H"
+    DMA8    = "1100_8"
+    DMA8H   = "1100_8H"
+    DMA16   = "1100_16"
+    DMA16H  = "1100_16H"
+    DMA32   = "1100_32"
+    DMA32H  = "1100_32H"
+    DMA64   = "1100_64"
+    DMA64H  = "1100_64H"
+
+
+DMA_ADD_REFERENCE = {
+    0: 0,
+    1: 1,
+    2: 2,
+    3: 4,
+    4: 8,
+    5: 16,
+    6: 32,
+    7: 64,
+}
 
 
 class DMADataRam(Enum):
@@ -499,14 +527,10 @@ class DMACommand(SpecialCommand):
     def from_binary(source: str):
         assert len(source) == 32
         cmd = DMACommand()
-        # Opcode
-        cmd.opcode = DMAOpcodes(cut(source, 28, 32))
 
         # DMA mode
         cmd.dma_mode = DMATransferMode(cut(source, 12, 13))
         cmd.hold = cut(source, 14, 15) == "1"
-        if cmd.hold:
-            cmd.opcode = DMAOpcodes.DMAH
 
         if cut(source, 13, 14) == "1":
             cmd.dma_counter_mode = DMACounterMode.REFERENCED
@@ -516,7 +540,7 @@ class DMACommand(SpecialCommand):
         # padding
         assert cut(source, 18, 28) == "0000000000"
         # Add mode
-        cmd.address_add_mode = int(cut(source, 15, 18))
+        cmd.address_add_mode = DMA_ADD_REFERENCE[int(cut(source, 15, 18), 2)]
 
         # Destination
         cmd.ram_address_pointer = DMADataRam(cut(source, 8, 11))
@@ -525,11 +549,18 @@ class DMACommand(SpecialCommand):
         else:
             cmd.dma_counter_ram = DMACounterRam(cut(source, 0, 3))
 
+        # Opcode
+        bits = f"{cut(source, 28, 32)}_{cmd.address_add_mode}"
+        if cmd.hold:
+            bits += "H"
+        cmd.opcode = DMAOpcodes(bits)
+
         return cmd
 
     def to_binary(self) -> str:
-        result = self.opcode.value + "0000000000"               # opcode + padding
-        result += bin(self.address_add_mode)[2:].rjust(3, "0")  # add mode
+        result = self.opcode.value[0:4] + "0000000000"               # opcode + padding
+        add_value = list(DMA_ADD_REFERENCE.keys())[list(DMA_ADD_REFERENCE.values()).index(self.address_add_mode)]
+        result += bin(add_value)[2:].rjust(3, "0")  # add mode
 
         # DMA modes
         result += "1" if self.hold else "0"
@@ -548,15 +579,20 @@ class DMACommand(SpecialCommand):
 
     @staticmethod
     def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
-        assert source[0] in ["DMA", "DMAH"]
-# TODO Handle address-add instructions DMA0, DMA1, DMA2, DMA4, DMA8... DMA64 LOL
+        assert source[0] in DMAOpcodes._member_names_
+
         cmd = DMACommand()
-        if source[0] == "DMA":
-            cmd.opcode = DMAOpcodes.DMA
-            cmd.hold = False
-        else:
-            cmd.opcode = DMAOpcodes.DMAH
+        cmd.opcode = DMAOpcodes[source[0]]
+
+        if source[0].endswith("H"):
+            add_text = source[0][3:-2]
             cmd.hold = True
+        else:
+            add_text = source[0][3:-1]
+            cmd.hold = False
+
+        if add_text:
+            cmd.address_add_mode = int(add_text)
 
         if source[1] == "D0":
             cmd.dma_mode = DMATransferMode.D0_TO_RAM
@@ -576,6 +612,7 @@ class DMACommand(SpecialCommand):
 
     def to_text(self) -> List[str]:
         result = "DMA"
+        result += str(self.address_add_mode)
         if self.hold:
             result += "H"
 

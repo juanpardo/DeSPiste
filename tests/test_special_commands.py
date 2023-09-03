@@ -41,56 +41,56 @@ def test_end_loop_text(text, ctype):
     "expected_text,bits",
     [
         (
-            "DMA D0,MC3,4",
+            "DMA64 D0,MC3,4",
 
             "1100"          # Opcode                    28-31
             "0000000000"    # padding                   18-27
-            "000"           # Add mode                  15-17
+            "111"           # Add mode                  15-17
             "0000"         # DMA mode                   11-14
             "011"            # Destination               8-10
             "00000100"      # Counter immediate value    0- 7
         ),
         (
-            "DMAH D0,MC3,4",
+            "DMA1H D0,MC3,4",
 
             "1100"          # Opcode
             "0000000000"    # padding
             "00"            # Add mode (forced 0)
-            "0"             # Add mode (valid only for A-bus
+            "1"             # Add mode (valid only for A-bus
             "1000"          # DMA mode
             "011"           # Destination
             "00000"         # padding
             "100"           # Counter immediate value
         ),
         (
-            "DMA MC1,D0,4",
+            "DMA1 MC1,D0,4",
 
             "1100"          # Opcode
             "0000000000"    # padding
-            "000"           # Add mode
+            "001"           # Add mode
             "0010"         # DMA mode
             "001"            # Destination
             "00000100"      # Counter immediate value
         ),
         (
-            "DMAH MC1,D0,4",
+            "DMA1H MC1,D0,4",
 
             "1100"  # Opcode
             "0000000000"  # padding
-            "000"  # Add mode
+            "001"  # Add mode
             "1010"  # DMA mode
             "001"  # Destination
             "00000100"  # Counter immediate value
         ),
         (
-                "DMAH MC1,D0,MC3",
+            "DMA0H MC1,D0,MC3",
 
-                "1100"  # Opcode
-                "0000000000"  # padding
-                "000"  # Add mode
-                "1110"  # DMA mode
-                "001"  # Destination
-                "00000011"  # Counter source value
+            "1100"  # Opcode
+            "0000000000"  # padding
+            "000"  # Add mode
+            "1110"  # DMA mode
+            "001"  # Destination
+            "00000011"  # Counter source value
         ),
     ]
 )
@@ -104,9 +104,9 @@ def test_dma_binary(expected_text, bits):
 @pytest.mark.parametrize(
     "text",
     [
-        (["DMA", "D0", "MC3", 5]),
-        (["DMAH", "D0", "MC3", 5]),
-        (["DMA", "MC1", "D0", 5]),
+        (["DMA1", "D0", "MC3", 5]),
+        (["DMA1H", "D0", "MC3", 5]),
+        (["DMA1", "MC1", "D0", 5]),
     ]
 )
 def test_dma_text(text):
