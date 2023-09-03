@@ -186,13 +186,11 @@ def test_jump_text(text):
     "expected_text,bits",
     [
         (
-            "JMP #128,MC3",
+            "JMP #64",
 
-            "10"          # Opcode
-            "0011"           # Destination
-            "0"         # MVI mode: Unconditional
-            "00000000000000000000"              # Immediate, high 20
-            "00100"      # Immediate value (remaining lower 5 bits)
+            "1101"          # Opcode
+            "000000000000000000000"              # Padding (21 bits)
+            "1000000"      # Immediate value (remaining lower 7 bits)
         ),
     ]
 )

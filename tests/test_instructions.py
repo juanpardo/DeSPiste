@@ -19,12 +19,12 @@ from despiste.program import Instruction
         (
             [
                 AluControlCommand.from_text(["SUB"]),
-                XBusControlCommand.from_text(["MOV", "RAM1", "X"]),
+                XBusControlCommand.from_text(["MOV", "M1", "X"]),
                 XBusControlCommand.from_text(["MOV", "MUL", "P"]),
-                YBusControlCommand.from_text(["MOV", "RAM0", "Y"]),
+                YBusControlCommand.from_text(["MOV", "M0", "Y"]),
                 YBusControlCommand.from_text(["MOV", "ALU", "A"]),
                 D1BusControlCommand.from_text(["MOV", "#27", "MC2"]),
-            ], ["SUB", "MOV RAM1,X", "MOV MUL,P", "MOV RAM0,Y", "MOV ALU,A", "MOV #27,MC2"]
+            ], ["SUB", "MOV M1,X", "MOV MUL,P", "MOV M0,Y", "MOV ALU,A", "MOV #27,MC2"]
         ),
     ]
 )
