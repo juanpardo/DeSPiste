@@ -66,4 +66,4 @@ def test_instruction_special_command_binary():
     instruction = Instruction.from_binary(bits)
     assert instruction.specialCommand
     assert instruction.to_binary() == bits
-    assert instruction.to_text() == ["DMAH MC1,D0,4"]
+    assert instruction.to_text() == ["DMAH0 MC1,D0,4"]

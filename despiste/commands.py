@@ -455,21 +455,21 @@ class DMAOpcodes(OpCodes):
     DMA     = "1100___"
     DMAH    = "1100__H"
     DMA0    = "1100_0"
-    DMA0H   = "1100_0H"
+    DMAH0   = "1100_0H"
     DMA1    = "1100_1"
-    DMA1H   = "1100_1H"
+    DMAH1   = "1100_1H"
     DMA2    = "1100_2"
-    DMA2H   = "1100_2H"
+    DMAH2   = "1100_2H"
     DMA4    = "1100_4"
-    DMA4H   = "1100_4H"
+    DMAH4   = "1100_4H"
     DMA8    = "1100_8"
-    DMA8H   = "1100_8H"
+    DMAH8   = "1100_8H"
     DMA16   = "1100_16"
-    DMA16H  = "1100_16H"
+    DMAH16  = "1100_16H"
     DMA32   = "1100_32"
-    DMA32H  = "1100_32H"
+    DMAH32  = "1100_32H"
     DMA64   = "1100_64"
-    DMA64H  = "1100_64H"
+    DMAH64  = "1100_64H"
 
 
 DMA_ADD_REFERENCE = {
@@ -584,8 +584,8 @@ class DMACommand(SpecialCommand):
         cmd = DMACommand()
         cmd.opcode = DMAOpcodes[source[0]]
 
-        if source[0].endswith("H"):
-            add_text = source[0][3:-2]
+        if source[0].startswith("DMAH"):
+            add_text = source[0][4:-1]
             cmd.hold = True
         else:
             add_text = source[0][3:-1]
@@ -612,9 +612,9 @@ class DMACommand(SpecialCommand):
 
     def to_text(self) -> List[str]:
         result = "DMA"
-        result += str(self.address_add_mode)
         if self.hold:
             result += "H"
+        result += str(self.address_add_mode)
 
         if self.dma_mode == DMATransferMode.D0_TO_RAM:
             result += f" D0,{self.ram_address_pointer.name},"

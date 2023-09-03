@@ -51,7 +51,7 @@ def test_end_loop_text(text, ctype):
             "00000100"      # Counter immediate value    0- 7
         ),
         (
-            "DMA1H D0,MC3,4",
+            "DMAH1 D0,MC3,4",
 
             "1100"          # Opcode
             "0000000000"    # padding
@@ -73,7 +73,7 @@ def test_end_loop_text(text, ctype):
             "00000100"      # Counter immediate value
         ),
         (
-            "DMA1H MC1,D0,4",
+            "DMAH1 MC1,D0,4",
 
             "1100"  # Opcode
             "0000000000"  # padding
@@ -83,7 +83,7 @@ def test_end_loop_text(text, ctype):
             "00000100"  # Counter immediate value
         ),
         (
-            "DMA0H MC1,D0,MC3",
+            "DMAH0 MC1,D0,MC3",
 
             "1100"  # Opcode
             "0000000000"  # padding
@@ -105,7 +105,7 @@ def test_dma_binary(expected_text, bits):
     "text",
     [
         (["DMA1", "D0", "MC3", 5]),
-        (["DMA1H", "D0", "MC3", 5]),
+        (["DMAH1", "D0", "MC3", 5]),
         (["DMA1", "MC1", "D0", 5]),
     ]
 )
