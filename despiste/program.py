@@ -76,19 +76,53 @@ class D1BusControlCommand(Command):
     destination: D1BusDataDestination = None
     immediate: int = None
 
-    def from_binary(self, source):
-
-        self.opcode = D1BusOpcodes(cut(source, 12, 14))
-        if self.opcode != D1BusOpcodes.NOP:
-            self.destination = D1BusDataDestination(cut(source, 8, 12))
+    @staticmethod
+    def from_binary(source: str) -> Command:
+        cmd = D1BusControlCommand()
+        cmd.opcode = D1BusOpcodes(cut(source, 12, 14))
+        if cmd.opcode != D1BusOpcodes.NOP:
+            cmd.destination = D1BusDataDestination(cut(source, 8, 12))
 
         # if source is IMMEDIATE
-        if self.opcode == D1BusOpcodes.MOV_IMM_DST:
-            self.immediate = int(cut(source, 0, 8), 2)
-            self.source = None
-        elif self.opcode == D1BusOpcodes.MOV_SRC_DST:
-            self.immediate = None
-            self.source = D1BusDataSource(cut(source, 0, 4))
+        if cmd.opcode == D1BusOpcodes.MOV_IMM_DST:
+            cmd.immediate = int(cut(source, 0, 8), 2)
+            cmd.source = None
+        elif cmd.opcode == D1BusOpcodes.MOV_SRC_DST:
+            cmd.immediate = None
+            cmd.source = D1BusDataSource(cut(source, 0, 4))
+
+        return cmd
+
+    def to_binary(self) -> str:
+        result = self.opcode.value
+
+        if self.opcode == D1BusOpcodes.NOP:
+            result += "000000000000"
+
+        if self.destination:
+            result += self.destination.value
+
+        if self.immediate is not None:
+            result += bin(self.immediate)[2:].zfill(8)
+        elif self.source:
+            result += "0000" + self.source.value
+
+        return result
+
+    @staticmethod
+    def from_text(source: List[str]) -> Command:
+        cmd = D1BusControlCommand()
+        cmd.destination = D1BusDataDestination[source[2]]
+        # Using SRC?
+        try:
+            cmd.source = D1BusDataSource[source[1]]
+            cmd.opcode = D1BusOpcodes.MOV_SRC_DST
+        except KeyError:
+            if source[1].startswith('#'):
+                source[1] = source[1][1:]
+            cmd.immediate = int(source[1])
+            cmd.opcode = D1BusOpcodes.MOV_IMM_DST
+        return cmd
 
     def to_text(self) -> List[str]:
         result = self.opcode.name[:3]
@@ -129,17 +163,54 @@ class XYBusDataSource(Enum):
 class YBusControlCommand(Command):
     source: XYBusDataSource
 
-    def from_binary(self, source):
-        self.opcode = YBusOpcodes(cut(source, 3, 6))
+    @staticmethod
+    def from_binary(source):
+        cmd = YBusControlCommand()
+        cmd.opcode = YBusOpcodes(cut(source, 3, 6))
         ops_with_source = [
             YBusOpcodes.MOV_SRC_Y,
             YBusOpcodes.MOV_SRC_Y_ALU_A,
             YBusOpcodes.MOV_SRC_A
         ]
-        if self.opcode in ops_with_source:
-            self.source = XYBusDataSource(cut(source, 0, 3))
+        if cmd.opcode in ops_with_source:
+            cmd.source = XYBusDataSource(cut(source, 0, 3))
         else:
-            self.source = None
+            cmd.source = None
+
+        return cmd
+
+    def to_binary(self) -> str:
+        if self.source is None:
+            return f"{self.opcode.value}000"
+        else:
+            return f"{self.opcode.value}{self.source.value}"
+
+    @staticmethod
+    def from_text(source):
+        cmd = YBusControlCommand()
+
+        if source[0] == 'NOP':
+            assert len(source) == 1
+            cmd.opcode = YBusOpcodes.NOP
+            return cmd
+
+        if source[0] == 'CLR':
+            assert len(source) == 2
+            assert source[1] == "A"
+            cmd.opcode = YBusOpcodes.CLR_A
+            return cmd
+
+        assert source[0] == "MOV"
+        if source[2] == 'Y':
+            cmd.opcode = YBusOpcodes.MOV_SRC_Y
+            cmd.source = XYBusDataSource[source[1]]
+        else:
+            try:
+                cmd.source = XYBusDataSource[source[1]]
+                cmd.opcode = YBusOpcodes.MOV_SRC_A
+            except KeyError:
+                cmd.opcode = YBusOpcodes.MOV_ALU_A
+        return cmd
 
     def to_text(self) -> List[str]:
         if self.opcode == YBusOpcodes.NOP:
@@ -172,17 +243,46 @@ class XBusOpcodes(OpCodes):
 class XBusControlCommand(Command):
     source: XYBusDataSource
 
-    def from_binary(self, source: str):
-        self.opcode = XBusOpcodes(cut(source, 3, 6))
-        ops_with_source = [
-            XBusOpcodes.MOV_SRC_X,
-            XBusOpcodes.MOV_SRC_X_MUL_P,
-            XBusOpcodes.MOV_SRC_P
-        ]
-        if self.opcode in ops_with_source:
-            self.source = XYBusDataSource(cut(source, 0, 3))
+    _ops_with_source = [
+        XBusOpcodes.MOV_SRC_X,
+        XBusOpcodes.MOV_SRC_X_MUL_P,
+        XBusOpcodes.MOV_SRC_P
+    ]
+
+    @staticmethod
+    def from_binary(source: str):
+        cmd = XBusControlCommand()
+        cmd.opcode = XBusOpcodes(cut(source, 3, 6))
+        if cmd.opcode in cmd._ops_with_source:
+            cmd.source = XYBusDataSource(cut(source, 0, 3))
         else:
-            self.source = None
+            cmd.source = None
+        return cmd
+
+    def to_binary(self) -> str:
+        if self.source is None:
+            return f"{self.opcode.value}000"
+        else:
+            return f"{self.opcode.value}{self.source.value}"
+
+    @staticmethod
+    def from_text(source: List[str]):
+        cmd = XBusControlCommand()
+
+        if source[0] == 'NOP':
+            cmd.opcode = XBusOpcodes.NOP
+            return cmd
+
+        if source[2] == 'X':
+            cmd.opcode = XBusOpcodes.MOV_SRC_X
+            cmd.source = XYBusDataSource[source[1]]
+        else:
+            try:
+                cmd.source = XYBusDataSource[source[1]]
+                cmd.opcode = XBusOpcodes.MOV_SRC_P
+            except KeyError:
+                cmd.opcode = XBusOpcodes.MOV_MUL_P
+        return cmd
 
     def to_text(self) -> List[str]:
         if self.opcode == XBusOpcodes.NOP:
@@ -216,8 +316,21 @@ class AluOpcodes(OpCodes):
 
 class AluControlCommand(Command):
 
-    def from_binary(self, source: str):
-        self.opcode = AluOpcodes(source)
+    @staticmethod
+    def from_binary(source: str):
+        cmd = AluControlCommand()
+        cmd.opcode = AluOpcodes(source)
+        return cmd
+
+    def to_binary(self) -> str:
+        return self.opcode.value
+
+    @staticmethod
+    def from_text(source: List[str]) -> Command:
+        assert len(source) == 1
+        cmd = AluControlCommand()
+        cmd.opcode = AluOpcodes[source[0]]
+        return cmd
 
     def to_text(self) -> List[str]:
         return [self.opcode.name]
@@ -254,8 +367,7 @@ class Instruction:
             self.xBusControlCommand.from_binary(cut(source, 20, 26))
 
             # Bytes 26 to 29 are ALU Control
-            self.aluControlCommand = AluControlCommand()
-            self.aluControlCommand.from_binary(cut(source, 26, 30))
+            self.aluControlCommand = AluControlCommand.from_binary()
 
     def __str__(self):
         return "\t\t\t".join([
