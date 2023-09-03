@@ -390,3 +390,118 @@ class LoopCommand(SpecialCommand):
 
     def to_text(self) -> List[str]:
         return [self.opcode.name]
+
+
+class DMAOpcodes(OpCodes):
+    DMA = "1100"
+    DMAH = "1100"
+
+
+class DMADataRam(Enum):
+    MC0 = "000"
+    MC1 = "001"
+    MC2 = "010"
+    MC3 = "011"
+    PRG = "100"
+
+
+class DMATransferMode(Enum):
+    D0_TO_RAM = "0"
+    RAM_TO_D0 = "1"
+
+
+class DMACounterMode(Enum):
+    IMMEDIATE = "0"
+    REFERENCED = "1"
+
+
+class DMACommand(SpecialCommand):
+    opcode: DMAOpcodes
+    hold: bool  # Determines if the DSP is to wait for the DMA transfer to finish?
+    address_add_mode: int = 1  # Default is 1
+    ram_address_pointer: DMADataRam
+    dma_mode: DMATransferMode
+    data_size: int = None
+    dma_counter_mode: DMACounterMode
+
+    @staticmethod
+    def from_binary(source: str):
+        assert len(source) == 32
+        cmd = DMACommand()
+        # Opcode
+        cmd.opcode = DMAOpcodes(cut(source, 28, 32))
+
+        # DMA mode
+        cmd.dma_mode = DMATransferMode(cut(source, 12, 13))
+        cmd.hold = cut(source, 14, 15) == "1"
+        if cmd.hold:
+            cmd.opcode = DMAOpcodes.DMAH
+
+        if cut(source, 13, 14) == "1":
+            cmd.dma_counter_mode = DMACounterMode.REFERENCED
+        else:
+            cmd.dma_counter_mode = DMACounterMode.IMMEDIATE
+
+        # padding
+        assert cut(source, 18, 28) == "0000000000"
+        # Add mode
+        cmd.address_add_mode = int(cut(source, 15, 18))
+
+        # Destination
+        cmd.ram_address_pointer = DMADataRam(cut(source, 8, 11))
+        cmd.data_size = int(cut(source, 0, 8), 2)
+
+        return cmd
+
+    def to_binary(self) -> str:
+        result = self.opcode.value + "0000000000"               # opcode + padding
+        result += bin(self.address_add_mode)[2:].rjust(3, "0")  # add mode
+
+        # DMA modes
+        result += "1" if self.hold else "0"
+        result += self.dma_counter_mode.value
+        result += self.dma_mode.value
+
+        result += "0"  # padding
+
+        result += self.ram_address_pointer.value
+        result += bin(self.data_size)[2:].rjust(8, "0")
+
+        return result
+
+    @staticmethod
+    def from_text(source: List[str]) -> Command:
+        assert source[0] in ["DMA", "DMAH"]
+# TODO Handle address-add instructions DMA0, DMA1, DMA2, DMA4, DMA8... DMA64 LOL
+        cmd = DMACommand()
+        if source[0] == "DMA":
+            cmd.opcode = DMAOpcodes.DMA
+            cmd.hold = False
+        else:
+            cmd.opcode = DMAOpcodes.DMAH
+            cmd.hold = True
+
+        if source[1] == "D0":
+            cmd.dma_mode = DMATransferMode.D0_TO_RAM
+            cmd.ram_address_pointer = DMADataRam[source[2]]
+        else:
+            cmd.dma_mode = DMATransferMode.RAM_TO_D0
+            cmd.ram_address_pointer = DMADataRam[source[1]]
+
+        cmd.data_size = int(source[3])
+
+        return cmd
+
+    def to_text(self) -> List[str]:
+        result = "DMA"
+        if self.hold:
+            result += "H"
+
+        if self.dma_mode == DMATransferMode.D0_TO_RAM:
+            result += f" D0,{self.ram_address_pointer.name},"
+        else:
+            result += f" {self.ram_address_pointer.name},D0,"
+
+        result += str(self.data_size)
+
+        return [result]

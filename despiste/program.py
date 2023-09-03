@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List
 
 from despiste.commands import AluControlCommand, XBusControlCommand, YBusControlCommand, D1BusControlCommand, Command, \
-    SpecialCommand, XBusOpcodes, YBusOpcodes, EndCommand
+    SpecialCommand, XBusOpcodes, YBusOpcodes, EndCommand, LoopCommand
 from despiste.utils import cut
 
 
