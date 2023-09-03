@@ -1,7 +1,26 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
+from despiste.instruction_context import InstructionContext
 from despiste.utils import cut
+
+
+def get_immediate_value(value: str, context: Optional[InstructionContext]):
+    # Check if starts with '#' it is an immediate value
+    if value.startswith('#'):
+        return int(value[1:])
+
+    # It must be either a number or a constant
+    if value.isdigit():
+        return int(value)
+    elif context:
+        if context.constants.get(value, None):
+            return context.constants.get(value)
+        else:
+            raise Exception(f"Immediate value uses constant that does not exist: {value}")
+    else:
+        raise Exception(f"Immediate value is not a number and no program was passed so no constants can be used.")
+
 
 
 class OpCodes(Enum):
@@ -99,7 +118,7 @@ class D1BusControlCommand(Command):
         return result
 
     @staticmethod
-    def from_text(source: List[str]) -> Command:
+    def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
         cmd = D1BusControlCommand()
         if source[0] == "NOP":
             assert len(source) == 1
@@ -180,7 +199,7 @@ class YBusControlCommand(Command):
             return f"{self.opcode.value}{self.source.value}"
 
     @staticmethod
-    def from_text(source):
+    def from_text(source: List[str], context: Optional[InstructionContext] = None):
         cmd = YBusControlCommand()
 
         if source[0] == 'NOP':
@@ -260,7 +279,7 @@ class XBusControlCommand(Command):
             return f"{self.opcode.value}{self.source.value}"
 
     @staticmethod
-    def from_text(source: List[str]):
+    def from_text(source: List[str], context: Optional[InstructionContext] = None):
         cmd = XBusControlCommand()
 
         if source[0] == 'NOP':
@@ -320,7 +339,7 @@ class AluControlCommand(Command):
         return self.opcode.value
 
     @staticmethod
-    def from_text(source: List[str]) -> Command:
+    def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
         assert len(source) == 1
         cmd = AluControlCommand()
         cmd.opcode = AluOpcodes[source[0]]
@@ -335,6 +354,7 @@ class SpecialCommand(Command):
     Represents commands that are lonely: DMA, END, JMP...
     """
     pass
+
 
 class EndOpcodes(OpCodes):
     END = "11110"
@@ -354,7 +374,7 @@ class EndCommand(SpecialCommand):
         return self.opcode.value.ljust(32, "0")
 
     @staticmethod
-    def from_text(source: List[str]) -> Command:
+    def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
         assert len(source) == 1
         cmd = EndCommand()
         cmd.opcode = EndOpcodes[source[0]]
@@ -382,7 +402,7 @@ class LoopCommand(SpecialCommand):
         return self.opcode.value.ljust(32, "0")
 
     @staticmethod
-    def from_text(source: List[str]) -> Command:
+    def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
         assert len(source) == 1
         cmd = LoopCommand()
         cmd.opcode = LoopOpcodes[source[0]]
@@ -488,7 +508,7 @@ class DMACommand(SpecialCommand):
         return result
 
     @staticmethod
-    def from_text(source: List[str]) -> Command:
+    def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
         assert source[0] in ["DMA", "DMAH"]
 # TODO Handle address-add instructions DMA0, DMA1, DMA2, DMA4, DMA8... DMA64 LOL
         cmd = DMACommand()
@@ -572,11 +592,11 @@ class MVICommand(SpecialCommand):
     condition: MVIConditionStatus
 
     @staticmethod
-    def from_text(source: List[str]) -> Command:
+    def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
         cmd = MVICommand()
         assert source[0] == 'MVI'
         cmd.opcode = MVIOpcodes.MVI
-        cmd.immediate = int(source[1][1:]) if source[1].startswith('#') else int(source[1])
+        cmd.immediate = get_immediate_value(source[1], context)
         cmd.destination = MVIStorageDestination[source[2]]
 
         if len(source) == 4:
@@ -642,7 +662,7 @@ class JumpCommand:
     immediate: int
 
     @staticmethod
-    def from_text(source: List[str]) -> Command:
+    def from_text(source: List[str], context: Optional[InstructionContext] = None) -> Command:
         cmd = JumpCommand()
         assert source[0] == "JMP"
         cmd.opcode = JumpOpcodes.JMP
@@ -695,38 +715,38 @@ class JumpCommand:
         return result
 
 
-def generate_command_from_text(data: List[str]) -> Command:
+def generate_command_from_text(data: List[str], context: Optional[InstructionContext] = None) -> Command:
     print(f"generate_command data: {data}")
     if data[0] == 'NOP':
         return None
     elif data[0] == 'MOV':
         # Y Bus cmd?
         if data[2] in ['Y', 'A']:
-            return YBusControlCommand.from_text(data)
+            return YBusControlCommand.from_text(data, context)
 
         # X Bus cmd?
         elif data[2] in ['X', 'P']:
-            return XBusControlCommand.from_text(data)
+            return XBusControlCommand.from_text(data, context)
 
         # D1 Bus cmd!
         else:
-            return D1BusControlCommand.from_text(data)
+            return D1BusControlCommand.from_text(data, context)
 
     elif data[0] == 'CLR':
         # We treat it specially because then only MOV ops are left for YBus ^^
-        return YBusControlCommand.from_text(data)
+        return YBusControlCommand.from_text(data, context)
 
     elif data[0] in AluOpcodes._member_names_:
-        return AluControlCommand.from_text(data)
+        return AluControlCommand.from_text(data, context)
     elif data[0] in EndOpcodes._member_names_:
-        return EndCommand.from_text(data)
+        return EndCommand.from_text(data, context)
     elif data[0] in LoopOpcodes._member_names_:
-        return LoopCommand.from_text(data)
+        return LoopCommand.from_text(data, context)
     elif data[0] in DMAOpcodes._member_names_:
-        return DMACommand.from_text(data)
+        return DMACommand.from_text(data, context)
     elif data[0] in MVIOpcodes._member_names_:
-        return MVICommand.from_text(data)
+        return MVICommand.from_text(data, context)
     elif data[0] in JumpOpcodes._member_names_:
-        return JumpCommand.from_text(data)
+        return JumpCommand.from_text(data, context)
 
     raise Exception(f"Command not supported. Data: {data}")
