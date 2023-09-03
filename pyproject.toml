@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "despiste"
+name = "DeSPiste"
 version = "0.1.0"
-description = ""
+description = "Compiler / Decompiler for the Sega Saturn SCU DSP"
 authors = ["enTropy"]
 readme = "README.md"
 
