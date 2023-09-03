@@ -617,3 +617,79 @@ class MVICommand(SpecialCommand):
             result += "0" + bin(self.immediate)[2:].zfill(25)
 
         return result
+
+
+class JumpOpcodes(OpCodes):
+    JMP = "1101"
+
+
+class JumpMode(Enum):
+    Z               = "1100001"
+    NZ              = "1000001"
+    S               = "1100010"
+    NS              = "1000010"
+    C               = "1100100"
+    NC              = "1000100"
+    T0              = "1101000"
+    NT0             = "1001000"
+    ZS              = "1100011"
+    NZS             = "1000011"
+
+
+class JumpCommand:
+    opcode: JumpOpcodes
+    condition: JumpMode
+    immediate: int
+
+    @staticmethod
+    def from_text(source: List[str]) -> Command:
+        cmd = JumpCommand()
+        assert source[0] == "JMP"
+        cmd.opcode = JumpOpcodes.JMP
+
+        # If unconditional...
+        if len(source) == 2:
+            cmd.condition = None
+            immediate = source[1]
+        else:
+            cmd.condition = JumpMode[source[1]]
+            immediate = source[2]
+
+        cmd.immediate = int(immediate[1:]) if immediate.startswith('#') else int(immediate)
+        return cmd
+
+    def to_text(self) -> List[str]:
+        result = self.opcode.name
+        if self.condition:
+            result += f" {self.condition.name},#{str(self.immediate)}"
+        else:
+            result += f" #{str(self.immediate)}"
+
+        return [result]
+
+    @staticmethod
+    def from_binary(source: str) -> Command:
+        assert len(source) == 32
+        cmd = JumpCommand()
+        cmd.opcode = JumpOpcodes.JMP(cut(source, 28, 32))
+
+        status = cut(source, 19, 26)
+
+        try:
+            cmd.condition = JumpMode(status)
+        except KeyError:
+            # If a jump condition is not found, then it's an unconditional jump!
+            cmd.condition = None
+
+        cmd.immediate = int(cut(source, 0, 7), 2)
+
+    def to_binary(self) -> str:
+        result = self.opcode.value + "00"
+        if self.condition:
+            result += self.condition.value
+        else:
+            result += "0000000"  # Unconditional mode
+
+        result += "".zfill(12)
+        result += bin(self.immediate)[2:].zfill(7)
+        return result

@@ -1,7 +1,7 @@
 # End Commands
 import pytest
 
-from despiste.commands import EndCommand, EndOpcodes, LoopCommand, LoopOpcodes, DMACommand, MVICommand
+from despiste.commands import EndCommand, EndOpcodes, LoopCommand, LoopOpcodes, DMACommand, MVICommand, JumpCommand
 
 
 # END and Loop commands
@@ -159,5 +159,45 @@ def test_mvi_text(text):
 def test_mvi_binary(expected_text, bits):
     assert len(bits) == 32
     cmd = MVICommand.from_binary(bits)
+    assert cmd.to_binary() == bits
+    assert cmd.to_text() == [expected_text]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        (["JMP", "128"]),
+        (["JMP", "#128"]),
+        (["JMP", "NZ", "128"]),
+        (["JMP", "NT0", "#128"]),
+    ]
+)
+def test_jump_text(text):
+    cmd = JumpCommand.from_text(text)
+    if len(text) == 3:
+        immediate = text[2] if text[2].startswith('#') else "#" + text[2]
+        assert cmd.to_text() == [f"{text[0]} {text[1]},{immediate}"]
+    else:
+        immediate = text[1] if text[1].startswith('#') else "#" + text[1]
+        assert cmd.to_text() == [f"{text[0]} {immediate}"]
+
+
+@pytest.mark.parametrize(
+    "expected_text,bits",
+    [
+        (
+            "JMP #128,MC3",
+
+            "10"          # Opcode
+            "0011"           # Destination
+            "0"         # MVI mode: Unconditional
+            "00000000000000000000"              # Immediate, high 20
+            "00100"      # Immediate value (remaining lower 5 bits)
+        ),
+    ]
+)
+def test_jump_binary(expected_text, bits):
+    assert len(bits) == 32
+    cmd = JumpCommand.from_binary(bits)
     assert cmd.to_binary() == bits
     assert cmd.to_text() == [expected_text]
