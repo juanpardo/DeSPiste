@@ -25,4 +25,3 @@ def test_program_from_binary_to_text():
 
     assert len(p.instructions) == 13
 
-    print(str(p))

@@ -1,7 +1,8 @@
 from enum import Enum
 from typing import List
 
-from despiste.program import Program, Instruction, Command, AluOpcodes, AluControlCommand, YBusControlCommand, \
+from despiste.program import Program, Instruction
+from despiste.commands import Command, AluOpcodes, AluControlCommand, YBusControlCommand, \
     YBusOpcodes, D1BusControlCommand, D1BusOpcodes, D1BusDataSource, D1BusDataDestination, XYBusDataSource, \
     XBusControlCommand, XBusOpcodes
 from despiste.utils import read_file_content, write_file_content
@@ -36,7 +37,7 @@ command_args = {
 }
 
 
-def generate_command(data: List[str]) -> Command:
+def generate_command_from_text(data: List[str]) -> Command:
     print(f"generate_command data: {data}")
     if data[0] == 'NOP':
         return None
@@ -126,16 +127,7 @@ def add_command_to_instruction(cmd: Command, instruction: Instruction):
             instruction.yBusControlCommand.opcode = YBusOpcodes.MOV_SRC_Y_ALU_A
 
 
-class FileParserState(Enum):
-    HEADER = 0
-    BODY = 1
-
-
-file_parser_state = FileParserState.HEADER
-
-
 def generate_instruction_from_line(line: str) -> Instruction:
-    global file_parser_state
 
     # Avoid the pesky commas
     line = line.replace(',', ' ').upper()
@@ -150,42 +142,36 @@ def generate_instruction_from_line(line: str) -> Instruction:
         if element.startswith(';'):
             break
 
-        if file_parser_state == FileParserState.HEADER and element == 'START:':
-            file_parser_state = FileParserState.BODY
-            return
-
-        elif file_parser_state == FileParserState.BODY:
-            if len(current_command) == 0:
-                current_command.append(element)
-            elif command_args[current_command[0]] + 1 <= len(current_command):
-                cmd = generate_command(current_command)
-                add_command_to_instruction(cmd, instruction)
-                current_command = [element]
-            else:
-                current_command.append(element)
+        if len(current_command) == 0:
+            current_command.append(element)
+        elif command_args[current_command[0]] + 1 <= len(current_command):
+            cmd = generate_command_from_text(current_command)
+            add_command_to_instruction(cmd, instruction)
+            current_command = [element]
+        else:
+            current_command.append(element)
 
     if len(current_command) > 0:
-        cmd = generate_command(current_command)
+        cmd = generate_command_from_text(current_command)
         add_command_to_instruction(cmd, instruction)
 
-    if not instruction.yBusControlCommand and not instruction.xBusControlCommand and not instruction.d1BusControlCommand and not instruction.aluControlCommand:
-        return None
+    if not instruction.specialCommand:
 
-    if not instruction.yBusControlCommand:
-        instruction.yBusControlCommand = YBusControlCommand()
-        instruction.yBusControlCommand.opcode = YBusOpcodes.NOP
+        if not instruction.yBusControlCommand:
+            instruction.yBusControlCommand = YBusControlCommand()
+            instruction.yBusControlCommand.opcode = YBusOpcodes.NOP
 
-    if not instruction.xBusControlCommand:
-        instruction.xBusControlCommand = XBusControlCommand()
-        instruction.xBusControlCommand.opcode = XBusOpcodes.NOP
+        if not instruction.xBusControlCommand:
+            instruction.xBusControlCommand = XBusControlCommand()
+            instruction.xBusControlCommand.opcode = XBusOpcodes.NOP
 
-    if not instruction.aluControlCommand:
-        instruction.aluControlCommand = AluControlCommand()
-        instruction.aluControlCommand.opcode = AluOpcodes.NOP
+        if not instruction.aluControlCommand:
+            instruction.aluControlCommand = AluControlCommand()
+            instruction.aluControlCommand.opcode = AluOpcodes.NOP
 
-    if not instruction.d1BusControlCommand:
-        instruction.d1BusControlCommand = D1BusControlCommand()
-        instruction.d1BusControlCommand.opcode = D1BusOpcodes.NOP
+        if not instruction.d1BusControlCommand:
+            instruction.d1BusControlCommand = D1BusControlCommand()
+            instruction.d1BusControlCommand.opcode = D1BusOpcodes.NOP
     print(f"Instruction parsed: {instruction.to_text()}")
     return instruction
 
@@ -194,12 +180,7 @@ def do_compile(input_file: str, output_file: str):
     input_bytes = read_file_content(input_file)
     input_lines = input_bytes.decode("utf-8").splitlines()
 
-    p = Program()
-
-    for line in input_lines:
-        instruction = generate_instruction_from_line(line)
-        if instruction:
-            p.instructions.append(instruction)
+    p = Program.from_text(input_lines)
 
     if output_file is None:
         print(p.to_binary())

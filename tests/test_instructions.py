@@ -1,6 +1,6 @@
 import pytest
 
-from despiste.commands import AluControlCommand, XBusControlCommand, YBusControlCommand, D1BusControlCommand
+from despiste.commands import AluControlCommand, XBusControlCommand, YBusControlCommand, D1BusControlCommand, MVICommand
 from despiste.program import Instruction
 
 
@@ -40,3 +40,30 @@ def test_instruction_binary():
     instruction = Instruction.from_binary(bits)
     assert instruction.to_binary() == bits
 
+
+def test_instruction_special_command_text():
+    cmds = [MVICommand.from_text(["MVI", "128", "WA0", "NZ"])]
+
+    instruction = Instruction.from_commands(cmds)
+    assert instruction.xBusControlCommand is None
+    assert instruction.yBusControlCommand is None
+    assert instruction.aluControlCommand is None
+    assert instruction.d1BusControlCommand is None
+    assert instruction.specialCommand == cmds[0]
+    assert instruction.to_text() == ["MVI #128,WA0,NZ"]
+
+
+def test_instruction_special_command_binary():
+    bits = (
+        "1100"  # Opcode
+        "0000000000"  # padding
+        "000"  # Add mode
+        "1010"  # DMA mode
+        "001"  # Destination
+        "00000100"  # Counter immediate value
+    )
+
+    instruction = Instruction.from_binary(bits)
+    assert instruction.specialCommand
+    assert instruction.to_binary() == bits
+    assert instruction.to_text() == ["DMAH MC1,D0,4"]

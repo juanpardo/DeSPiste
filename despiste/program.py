@@ -1,8 +1,8 @@
 from enum import Enum
-from typing import List
+from typing import List, Dict
 
 from despiste.commands import AluControlCommand, XBusControlCommand, YBusControlCommand, D1BusControlCommand, Command, \
-    SpecialCommand, XBusOpcodes, YBusOpcodes, EndCommand, LoopCommand
+    SpecialCommand, XBusOpcodes, YBusOpcodes, EndCommand, LoopCommand, DMACommand, MVICommand, JumpCommand
 from despiste.utils import cut
 
 
@@ -20,11 +20,11 @@ class Instruction:
     specialCommand: SpecialCommand = None
 
     @staticmethod
-    def from_commands(cmds: List[Command]):
+    def from_commands(cmds: List[Command]) -> 'Instruction':
         inst = Instruction()
-        if len(cmds) == 1 and type(cmds[0]) == SpecialCommand:
+        if len(cmds) == 1 and isinstance(cmds[0], SpecialCommand):
             inst.specialCommand = cmds[0]
-            return
+            return inst
 
         for cmd in cmds:
             match cmd:
@@ -67,7 +67,7 @@ class Instruction:
 
     def to_text(self) -> List[str]:
         if self.specialCommand:
-            return self.specialCommand.to_text()
+            return [self.specialCommand.to_text()]
         else:
             result = []
             if self.aluControlCommand:
@@ -101,23 +101,28 @@ class Instruction:
             # Bytes 26 to 29 are ALU Control
             inst.aluControlCommand = AluControlCommand.from_binary(cut(source, 26, 30))
 
-            return inst
         # END cmds
         elif cut(source, 28, 32) == '1111':
             inst.specialCommand = EndCommand.from_binary(cut(source, 27, 32))
-            return inst
         # Loop cmds
         elif cut(source, 28, 32) == '1110':
             inst.specialCommand = LoopCommand.from_binary(cut(source, 27, 32))
-
+        elif cut(source, 28, 32) == '1100':
+            inst.specialCommand = DMACommand.from_binary(source)
+        elif cut(source, 30, 32) == '10':
+            inst.specialCommand = MVICommand.from_binary(source)
+        elif cut(source, 28, 32) == '1101':
+            inst.specialCommand = JumpCommand.from_binary(source)
         else:
-            raise Exception("Not implemented yet")
+            raise Exception("Unknown command!")
+
+        return inst
 
     def to_binary(self) -> str:
         if self.specialCommand is None:
             return f"00{self.aluControlCommand.to_binary()}{self.xBusControlCommand.to_binary()}{self.yBusControlCommand.to_binary()}{self.d1BusControlCommand.to_binary()}"
         else:
-            raise Exception("Not implemented yet")
+            return self.specialCommand.to_binary()
 
     def __str__(self):
         return "\t\t\t".join([
@@ -134,9 +139,10 @@ class Program:
     The maximum amount of instructions that can be loaded is 256 (1KB of Program RAM).
     """
     instructions: List[Instruction] = []
+    labels: Dict[str, int]  # Key is the label name and value is the instruction index it points to
 
     @staticmethod
-    def from_binary(source: str):
+    def from_binary(source: str) -> 'Program':
         # Make sure the source is a multiple of 32, since each instruction is 32 bytes.
         assert len(source) % 32 == 0
 
@@ -158,6 +164,42 @@ class Program:
             result += inst.to_binary()
 
         return result
+
+    def register_label(self, label: str, instruction_offset: int):
+
+        # The maximum offset is 256, as the DSP Program RAM can't hold more instructions
+        assert instruction_offset < 256
+
+        # Clean up the label name by removing unwanted spaces and the colon
+        key = label.replace(":", "", 1).strip()
+        assert not self.labels.has_key(key)
+        self.labels[key] = instruction_offset
+
+    def register_constant(self, line):
+        assert line.contains('=')
+        array = line.split("=")
+        assert len(array) == 2
+        self.constants[array[0].strip()] = array[1].strip()
+
+    @staticmethod
+    def from_text(lines) -> 'Program':
+        p = Program()
+        for line in lines:
+            # Avoid the pesky commas, all upper case and clean
+            line = line.replace(',', ' ').upper().strip()
+            # Is it a label line?
+            if line.endswith(':'):
+                # The label should point to the next instruction to be registered
+                p.register_label(line, len(p.instructions))
+            # Is it a constant?
+            elif line.contains('='):
+                p.register_constant(line)
+            # Is it a full line comment?
+            elif line.strip().startswith(';'):
+                pass
+            else:
+                inst = Instruction.from_text(line.split())
+                p.instructions.append(inst)
 
     def __str__(self):
         return "\n".join([str(x) for x in self.instructions])

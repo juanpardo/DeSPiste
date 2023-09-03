@@ -7,4 +7,4 @@ Start:
   NOP           MOV MC0, X      MOV MC1, Y      NOP
   NOP           MOV MUL, P      NOP             NOP
   AD2           NOP             NOP             MOV ALL, MC2
-;ENDI
+ENDI
