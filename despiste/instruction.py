@@ -55,22 +55,16 @@ class Instruction:
         current_command = []
 
         for element in elements:
+            # If the first element, add it
             if len(current_command) == 0:
                 current_command.append(element)
-            elif (  # Finish the command and start a new one if...
-                    # ... The command is not a JMP command and we have reached its length
-                    current_command[0] != 'JMP' and command_args[current_command[0]] + 1 <= len(current_command) or
-                    # ... or the command is a JMP command and it already has 2 parameters (its maximum)
-                    current_command[0] == 'JMP' and len(current_command) == 3 or
-                    # ... or the command is a JMP command with one parameter and the next element is not
-                    # a valid second parameter
-                    current_command[0] == 'JMP' and len(current_command) == 2 and element not in JumpMode._member_names_
-            ):
+            # If the element is a command keyword, start a new command
+            elif element in command_args:
                 cmd = generate_command_from_text(current_command, context)
                 if cmd:
                     commands.append(cmd)
                 current_command = [element]
-
+            # Otherwise it must be a command parameter, add it
             else:
                 current_command.append(element)
 
@@ -82,7 +76,16 @@ class Instruction:
         if len(commands):
             return Instruction.from_commands(commands)
         else:
-            return None
+            return Instruction.get_noop()
+
+    @staticmethod
+    def get_noop() -> 'Instruction':
+        inst = Instruction()
+        inst.yBusControlCommand = YBusControlCommand.get_noop()
+        inst.xBusControlCommand = XBusControlCommand.get_noop()
+        inst.aluControlCommand = AluControlCommand.get_noop()
+        inst.d1BusControlCommand = D1BusControlCommand.get_noop()
+        return inst
 
     @staticmethod
     def from_commands(cmds: List[Command]) -> 'Instruction':
@@ -114,7 +117,8 @@ class Instruction:
                         inst.yBusControlCommand.source = cmd.source
                         inst.yBusControlCommand.opcode = YBusOpcodes.MOV_SRC_Y_ALU_A
                     else:
-                        raise Exception(f"Incompatible commands for YBus: {inst.yBusControlCommand.to_text()} and {cmd.to_text()}")
+                        msg = f"Incompatible commands for YBus: {inst.yBusControlCommand.to_text()} and {cmd.to_text()}"
+                        raise Exception(msg)
                 case D1BusControlCommand():
                     inst.d1BusControlCommand = cmd
                 case _:

@@ -4,9 +4,9 @@ from despiste.utils import read_file_content, write_file_content
 
 def program_to_text(p: Program) -> str:
     result = ""
-    if len(p.constants):
+    if len(p.context.constants):
         result += "; CONSTANTS\n"
-    for k, v in p.constants:
+    for k, v in p.context.constants:
         result += f" {k}={v}\n"
 
     result += "\n"
@@ -16,7 +16,7 @@ def program_to_text(p: Program) -> str:
     print("".join(header))
 
     for idx, inst in enumerate(p.instructions):
-        for label, pc in p.labels:
+        for label, pc in p.context.labels:
             if pc == idx:
                 result += f"{label}:\n"
 

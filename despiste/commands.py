@@ -21,19 +21,20 @@ def get_immediate_value(value: str, context: Optional[InstructionContext], use_c
         return int(value[1:])
 
     # It must be either a number or a constant
-    if value.isdigit():
+    try:
         return int(value)
-    elif context:
-        if use_constant and context.constants.get(value, None):
-            return context.constants.get(value)
-        elif not use_constant and context.labels.get(value, None):
-            return context.constants.get(value)
+    except ValueError:
+        if context:
+            if use_constant and context.constants.get(value, None):
+                return context.constants.get(value)
+            elif not use_constant and context.labels.get(value, None):
+                return context.labels.get(value)
+            else:
+                use = 'constant' if use_constant else 'label'
+                msg = f"Immediate value uses a {use} that does not exist: {value}"
+                raise Exception(msg)
         else:
-            use = 'constant' if use_constant else 'label'
-            msg = f"Immediate value uses a {use} that does not exist: {value}"
-            raise Exception(msg)
-    else:
-        raise Exception(f"Immediate value is must be a number because no context was passed.")
+            raise Exception(f"Immediate value is must be a number because no context was passed.")
 
 
 class OpCodes(Enum):
@@ -96,6 +97,12 @@ class D1BusControlCommand(Command):
     source: D1BusDataSource = None
     destination: D1BusDataDestination = None
     immediate: int = None
+
+    @staticmethod
+    def get_noop() -> 'D1BusControlCommand':
+        cmd = D1BusControlCommand()
+        cmd.opcode = D1BusOpcodes.NOP
+        return cmd
 
     @staticmethod
     def from_binary(source: str) -> Command:
@@ -190,6 +197,12 @@ class YBusControlCommand(Command):
     source: XYBusDataSource = None
 
     @staticmethod
+    def get_noop() -> 'YBusControlCommand':
+        cmd = YBusControlCommand()
+        cmd.opcode = YBusOpcodes.NOP
+        return cmd
+
+    @staticmethod
     def from_binary(source):
         cmd = YBusControlCommand()
         cmd.opcode = YBusOpcodes(cut(source, 3, 6))
@@ -276,6 +289,13 @@ class XBusControlCommand(Command):
     ]
 
     @staticmethod
+    def get_noop() -> 'XBusControlCommand':
+        cmd = XBusControlCommand()
+        cmd.opcode = XBusOpcodes.NOP
+        return cmd
+
+
+    @staticmethod
     def from_binary(source: str):
         cmd = XBusControlCommand()
         cmd.opcode = XBusOpcodes(cut(source, 3, 6))
@@ -360,6 +380,12 @@ class AluControlCommand(Command):
 
     def to_text(self) -> List[str]:
         return [self.opcode.name]
+
+    @staticmethod
+    def get_noop() -> 'AluControlCommand':
+        cmd = AluControlCommand()
+        cmd.opcode = AluOpcodes.NOP
+        return cmd
 
 
 class SpecialCommand(Command):
@@ -609,8 +635,12 @@ class MVICommand(SpecialCommand):
         cmd = MVICommand()
         assert source[0] == 'MVI'
         cmd.opcode = MVIOpcodes.MVI
-        cmd.immediate = get_immediate_value_constant_aware(source[1], context)
         cmd.destination = MVIStorageDestination[source[2]]
+        if cmd.destination == MVIStorageDestination.PC:
+            cmd.immediate = get_immediate_value_label_aware(source[1], context)
+        else:
+            cmd.immediate = get_immediate_value_constant_aware(source[1], context)
+
 
         if len(source) == 4:
             cmd.condition = MVIConditionStatus[source[3]]
@@ -704,17 +734,18 @@ class JumpCommand(SpecialCommand):
     def from_binary(source: str) -> Command:
         assert len(source) == 32
         cmd = JumpCommand()
-        cmd.opcode = JumpOpcodes.JMP(cut(source, 28, 32))
+        cmd.opcode = JumpOpcodes(cut(source, 28, 32))
 
         status = cut(source, 19, 26)
 
         try:
             cmd.condition = JumpMode(status)
-        except KeyError:
+        except ValueError:
             # If a jump condition is not found, then it's an unconditional jump!
             cmd.condition = None
 
         cmd.immediate = int(cut(source, 0, 7), 2)
+        return cmd
 
     def to_binary(self) -> str:
         result = self.opcode.value + "00"

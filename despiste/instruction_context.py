@@ -3,7 +3,7 @@ from typing import Dict
 
 class InstructionContext:
     labels: Dict[str, int] = {}  # Key is the label name and value is the instruction index it points to
-    constants: Dict[str, str] = {}  # Key is the constant name
+    constants: Dict[str, int] = {}  # Key is the constant name
 
     def register_label(self, label: str, instruction_offset: int):
 
@@ -19,4 +19,4 @@ class InstructionContext:
         assert '=' in line
         array = line.split("=")
         assert len(array) == 2
-        self.constants[array[0].strip()] = array[1].strip()
+        self.constants[array[0].strip()] = int(array[1].strip())
