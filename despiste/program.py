@@ -40,22 +40,44 @@ class Program:
     @staticmethod
     def from_text(lines) -> 'Program':
         p = Program()
+
+        # Labels and constants must be registered first so that they can be used before their declaration
+        instruction_counter = 0
+        for line in lines:
+            line = line.replace(',', ' ').replace('\t', ' ').upper().strip()
+            # Is it a full line comment? Or perhaps empty?
+            if line.startswith(';') or line == '':
+                continue
+            # Remove any trailing comment
+            line = line.split(';', 1)[0]
+            # Is it a label line?
+            # The check for spaces is needed to avoid stuff like 'JMP LABEL:'
+            if line.endswith(':') and " " not in line:
+                # The label should point to the next instruction to be registered
+                p.context.register_label(line, instruction_counter)
+            # Is it a constant?
+            elif '=' in line:
+                p.context.register_constant(line)
+            else:
+                instruction_counter += 1
+
+        # Second pass is for instructions only
         for line in lines:
             # Avoid the pesky commas, all upper case and clean
-            line = line.replace(',', ' ').upper().strip()
+            line = line.replace(',', ' ').replace('\t', ' ').upper().strip()
             # Is it a full line comment? Or perhaps empty?
             if line.startswith(';') or line == '':
                 continue
 
             # Remove any trailing comment
             line = line.split(';', 1)[0]
-            # Is it a label line?
-            if line.endswith(':'):
-                # The label should point to the next instruction to be registered
-                p.context.register_label(line, len(p.instructions))
-            # Is it a constant?
-            elif '=' in line:
-                p.context.register_constant(line)
+
+            # Labels and constants are already registered, so ignore
+            if '=' in line:
+                continue
+            # The check for spaces is needed to avoid stuff like 'JMP LABEL:'
+            elif line.endswith(':') and " " not in line:
+                continue
             else:
                 inst = Instruction.from_text(line.split(), p.context)
                 p.instructions.append(inst)

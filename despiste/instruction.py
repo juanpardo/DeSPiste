@@ -1,7 +1,7 @@
 from typing import List, Optional
 from despiste.commands import AluControlCommand, XBusControlCommand, YBusControlCommand, D1BusControlCommand, Command, \
     SpecialCommand, XBusOpcodes, YBusOpcodes, EndCommand, LoopCommand, DMACommand, MVICommand, JumpCommand, \
-    generate_command_from_text
+    generate_command_from_text, JumpMode
 from despiste.instruction_context import InstructionContext
 from despiste.utils import cut
 
@@ -57,11 +57,20 @@ class Instruction:
         for element in elements:
             if len(current_command) == 0:
                 current_command.append(element)
-            elif command_args[current_command[0]] + 1 <= len(current_command):
+            elif (  # Finish the command and start a new one if...
+                    # ... The command is not a JMP command and we have reached its length
+                    current_command[0] != 'JMP' and command_args[current_command[0]] + 1 <= len(current_command) or
+                    # ... or the command is a JMP command and it already has 2 parameters (its maximum)
+                    current_command[0] == 'JMP' and len(current_command) == 3 or
+                    # ... or the command is a JMP command with one parameter and the next element is not
+                    # a valid second parameter
+                    current_command[0] == 'JMP' and len(current_command) == 2 and element not in JumpMode._member_names_
+            ):
                 cmd = generate_command_from_text(current_command, context)
                 if cmd:
                     commands.append(cmd)
                 current_command = [element]
+
             else:
                 current_command.append(element)
 
@@ -109,7 +118,8 @@ class Instruction:
                 case D1BusControlCommand():
                     inst.d1BusControlCommand = cmd
                 case _:
-                    raise Exception(f"Unexpected command type {type(cmd)}")
+                    msg = f"Unexpected command type {type(cmd)}"
+                    raise Exception(msg)
 
         if not inst.aluControlCommand:
             inst.aluControlCommand = AluControlCommand.from_text(["NOP"])

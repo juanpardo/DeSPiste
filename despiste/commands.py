@@ -5,7 +5,17 @@ from despiste.instruction_context import InstructionContext
 from despiste.utils import cut
 
 
-def get_immediate_value(value: str, context: Optional[InstructionContext]):
+def get_immediate_value_label_aware(value: str, context: Optional[InstructionContext]):
+    if value.endswith(":"):
+        value = value[:-1]
+    return get_immediate_value(value, context, False)
+
+
+def get_immediate_value_constant_aware(value: str, context: Optional[InstructionContext]):
+    return get_immediate_value(value, context, True)
+
+
+def get_immediate_value(value: str, context: Optional[InstructionContext], use_constant = True):
     # Check if starts with '#' it is an immediate value
     if value.startswith('#'):
         return int(value[1:])
@@ -14,13 +24,16 @@ def get_immediate_value(value: str, context: Optional[InstructionContext]):
     if value.isdigit():
         return int(value)
     elif context:
-        if context.constants.get(value, None):
+        if use_constant and context.constants.get(value, None):
+            return context.constants.get(value)
+        elif not use_constant and context.labels.get(value, None):
             return context.constants.get(value)
         else:
-            raise Exception(f"Immediate value uses constant that does not exist: {value}")
+            use = 'constant' if use_constant else 'label'
+            msg = f"Immediate value uses a {use} that does not exist: {value}"
+            raise Exception(msg)
     else:
-        raise Exception(f"Immediate value is not a number and no program was passed so no constants can be used.")
-
+        raise Exception(f"Immediate value is must be a number because no context was passed.")
 
 
 class OpCodes(Enum):
@@ -50,10 +63,10 @@ class D1BusOpcodes(OpCodes):
 
 
 class D1BusDataSource(Enum):
-    RAM0 = '0000'  # DATA RAM0
-    RAM1 = '0001'  # DATA RAM1
-    RAM2 = '0010'  # DATA RAM2
-    RAM3 = '0011'  # DATA RAM3
+    M0 = '0000'  # DATA RAM0
+    M1 = '0001'  # DATA RAM1
+    M2 = '0010'  # DATA RAM2
+    M3 = '0011'  # DATA RAM3
     MC0 = '0100'  # DATA RAM0, CT0++
     MC1 = '0101'  # DATA RAM1, CT1++
     MC2 = '0110'  # DATA RAM2, CT2++
@@ -163,10 +176,10 @@ class YBusOpcodes(OpCodes):
 
 
 class XYBusDataSource(Enum):
-    RAM0 = '000'  # DATA RAM0
-    RAM1 = '001'  # DATA RAM1
-    RAM2 = '010'  # DATA RAM2
-    RAM3 = '011'  # DATA RAM3
+    M0 = '000'  # DATA RAM0
+    M1 = '001'  # DATA RAM1
+    M2 = '010'  # DATA RAM2
+    M3 = '011'  # DATA RAM3
     MC0 = '100'  # DATA RAM0, CT0++
     MC1 = '101'  # DATA RAM1, CT1++
     MC2 = '110'  # DATA RAM2, CT2++
@@ -596,7 +609,7 @@ class MVICommand(SpecialCommand):
         cmd = MVICommand()
         assert source[0] == 'MVI'
         cmd.opcode = MVIOpcodes.MVI
-        cmd.immediate = get_immediate_value(source[1], context)
+        cmd.immediate = get_immediate_value_constant_aware(source[1], context)
         cmd.destination = MVIStorageDestination[source[2]]
 
         if len(source) == 4:
@@ -656,7 +669,7 @@ class JumpMode(Enum):
     NZS             = "1000011"
 
 
-class JumpCommand:
+class JumpCommand(SpecialCommand):
     opcode: JumpOpcodes
     condition: JumpMode
     immediate: int
@@ -675,7 +688,7 @@ class JumpCommand:
             cmd.condition = JumpMode[source[1]]
             immediate = source[2]
 
-        cmd.immediate = int(immediate[1:]) if immediate.startswith('#') else int(immediate)
+        cmd.immediate = get_immediate_value_label_aware(immediate, context)
         return cmd
 
     def to_text(self) -> List[str]:
